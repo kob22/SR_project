@@ -16,13 +16,16 @@ os.chdir(mypath)
 mypath = os.getcwd()
 lock = '.lock'
 tmp = '.tmp'
-czas=10 #ile sekund czeka
+czas=15 #ile sekund czeka
 koniec = 0
 
 #lista plikow
 def ls():
-    onlyfiles = [ f for f in listdir(mypath) if isfile(join(mypath,f)) ]
-    return ''.join(onlyfiles)
+	onlyfiles = [ f for f in listdir(mypath) if isfile(join(mypath,f)) ]
+	lista = ''
+	for file in onlyfiles:
+		lista+= file +"\n"
+	return lista
 
 #tworzy transakcje z id+1 oraz nazwa pliku
 def new_transaction(fname,lock):
@@ -42,7 +45,16 @@ def update_transaction(id_t,status,name_copy):
 				trans[2]=name_copy
 	return 0
 		
-	
+
+def remove_running(id_t):
+	a=[]
+	for tran in running_transactions:
+		if tran[0]==id_t:
+			a=tran
+	if a:
+		running_transactions.remove(a)
+	return 0
+
 #zapisuje do pliku, tworzy lock jesli jest 
 def write(filepath,content):
 	fname = ntpath.basename(filepath)
@@ -78,12 +90,14 @@ def accept(transactionId):
 		if trans[0] == transactionId:
 			data = trans
 	fname=data[1]
-	if os.path.isfile(join(mypath,fname + tmp )):
-		os.rename(fname + tmp,fname)
-	if os.path.isfile(join(mypath,fname + lock )):
-		os.rename(fname + lock,fname + '_' + str(transactionId))
+	if data[3]== (-1):
+		if os.path.isfile(join(mypath,fname + tmp )):
+			os.rename(fname + tmp,fname)
+		if os.path.isfile(join(mypath,fname + lock )):
+			os.rename(fname + lock,fname + '_' + str(transactionId))
 
-	update_transaction(transactionId,1,fname + '_' + str(transactionId))
+		update_transaction(transactionId,1,fname + '_' + str(transactionId))
+		remove_running(transactionId)
 	return 1
 
 def refuse(transactionId):
@@ -111,18 +125,20 @@ def read(filepath):
 		out_file.close()
 		file = base64.b64encode(data)
 		return file
+	elif os.path.isfile(join(mypath,fname+lock)):
+		return 'zablokowany'
 	else:
-		return -1
+		return 'nie ma pliku'
 
 def timeout():
 
 	while(not koniec):
 		print 'abcasfsa'
 		if running_transactions and (( int(time.time()) - running_transactions[0][1] ) > czas):
-			print 'ubillllllllllllllleeeeeeeeeem'
 			id = running_transactions[0][0]
 			refuse(id)
 			running_transactions.pop(0)
+			print 'Transaction killed id: ',id
 		time.sleep(1)
 		
 
