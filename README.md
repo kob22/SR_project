@@ -1,1 +1,3 @@
-empty, what are you lookin for?
+Wymagania:
+python2.7
+pysimplesoap1.16
