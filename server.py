@@ -45,7 +45,7 @@ class Server:
             'my_dispatcher',
             location=self.serwer + ':' + self.port,
             action=self.serwer + ':' + self.port,  # SOAPAction
-            namespace="http://example.com/sample.wsdl", prefix="ns0",
+            namespace="http://server", prefix="ns0",
             trace=True,
             ns=True)
 

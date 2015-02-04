@@ -31,7 +31,7 @@ class Client:
         self.client = SoapClient(
             location=self.serwer,
             action=self.serwer,  # SOAPAction
-            namespace="http://example.com/sample.wsdl",
+            namespace="http://server",
             soap_ns='soap',
             trace=False,
             ns=False)
