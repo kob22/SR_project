@@ -8,6 +8,8 @@ import time
 from threading import Thread
 import sys
 import ConfigParser
+from select import select
+import cPickle as pickle
 
 from pysimplesoap.server import SoapDispatcher, SOAPHandler
 
@@ -21,6 +23,7 @@ class Server:
         self.lock = self.config.get(sys.argv[1], 'lock')
         self.tmp = self.config.get(sys.argv[1], 'tmp')
         self.czas = int(self.config.get(sys.argv[1], 'czas'))  # ile sekund czeka
+        self.time_admin = int(self.config.get(sys.argv[1], 'time_admin'))
         self.mypath = self.config.get(sys.argv[1], 'mypath')
         self.serwer = self.config.get(sys.argv[1], 'serwer')
         self.port = self.config.get(sys.argv[1], 'port')
@@ -33,7 +36,7 @@ class Server:
         self.mypath = os.getcwd()
         print self.mypath
         self.koniec = 0
-        self.automat = 1
+        self.automat = int(self.config.get(sys.argv[1], 'automat'))
         self.transaction_toaccept = []
 
     def start(self):
@@ -71,8 +74,8 @@ class Server:
                                      returns={'canommmitreturn': int},
                                      args={'transactionId': int})
 
-        dispatcher.register_function('rollback', self.rollback,
-                                     returns={'rollbackreturn': int},
+        dispatcher.register_function('forceRollback', self.force_rollback,
+                                     returns={'forcerollbackreturn': int},
                                      args={'transactionId': int})
 
         print "Starting server..."
@@ -84,34 +87,67 @@ class Server:
         thread1.start()
         thread2.start()
         input = ''
+
         while input != 'koniec':
-            input = raw_input('podaj co chcesz robic ')
+            a = 1
+            # input = raw_input('podaj co chcesz robic ')
         self.koniec = 1
         httpd.shutdown()
         print 'abc'
 
-    def add_to_accept(self, id_trans):
-        self.transaction_toaccept.append([id_trans, time.time(), -1, -1])
-        return 0
+    # def add_to_accept(self, id_trans,type):
+    # self.transaction_toaccept.append([id_trans, time.time(), type])
+    #     return 0
 
-    def do_transaction(self):
-        return 0
+    def save_to_file(self):
+        pickle.dump(self.transactions, open("transationcs" + self.port + ".p", "wb"))
 
+    def manual(self, trans_id, type):
+        if type == -1:
+            print 'Operacja %d pyta o mozliwosc zapisu, T/N (domyslnie=N)' % trans_id
+            answer, _, _ = select([sys.stdin], [], [], self.time_admin)
+            if answer:
+                s = sys.stdin.readline()
+                s = s[0]
+                if s.lower() == 't':
+                    print 'jesteeeem'
+                    return 0
+                else:
+                    return 1
+            else:
+                return 1
+        elif type == -2:
+            print 'Operacja %d jest gotowa do zapisu, T/N (domyslnie=N)' % trans_id
+            answer, _, _ = select([sys.stdin], [], [], self.time_admin)
+            if answer:
+                s = sys.stdin.readline()
+                s = s[0]
+                if s.lower() == 't':
+                    return 0
+                else:
+                    return 1
+        return 1
 
     def can_commit(self, transactionId):
         a = []
         for tran in self.running_transactions:
             if tran[0] == transactionId:
-                tran[2] = 0
+                if not self.automat:
+                    tran[2] = self.manual(transactionId, -1)
+                    return tran[2]
+                else:
+                    tran[2] = 0
             return 0
         return -1
 
-    def rollback(self, transactionId):
+    def force_rollback(self, transactionId):
         for trans in self.transactions:
             if trans[0] == transactionId:
                 os.rename(trans[1], trans[1] + self.lock)
-                os.rename(trans[2] + '_' + str(transactionId), trans[1])
+                os.rename(trans[2], trans[1])
                 os.remove(trans[1] + self.lock)
+                trans[4] = 0
+        return 0
 
     # lista plikow
     def ls(self):
@@ -125,7 +161,7 @@ class Server:
     # tworzy transakcje z id+1 oraz nazwa pliku
     def new_transaction(self, fname, lock):
         self.id += 1
-        transaction = [self.id, fname, lock, -1]
+        transaction = [self.id, fname, lock, -1, -1]
         self.transactions.append(transaction)
         self.running_transactions.append([self.id, time.time(), -1])  # ostatni parametr to ready to commit
         return self.id
@@ -187,7 +223,10 @@ class Server:
             if trans[0] == transactionId:
                 data = trans
         fname = data[1]
-        if data[3] == (-1):
+        result = 0
+        if not self.automat:
+            result = self.manual(transactionId, -2)
+        if data[3] == (-1) and not result:
             if os.path.isfile(join(self.mypath, fname + self.tmp)):
                 os.rename(fname + self.tmp, fname)
             if os.path.isfile(join(self.mypath, fname + self.lock)):
@@ -196,7 +235,8 @@ class Server:
             self.update_transaction(transactionId, 1, fname + '_' + str(transactionId))
             self.remove_running(transactionId)
             return 0
-        return -1
+        else:
+            return -1
 
     def refuse(self, transactionId):
         data = []
@@ -232,7 +272,6 @@ class Server:
     def timeout(self):
 
         while (not self.koniec):
-            print self.running_transactions
             to_kill = []
             for trans in self.running_transactions:
                 if ((( int(time.time()) - trans[1] ) > self.czas) and trans[2] == -1) or (
@@ -242,6 +281,7 @@ class Server:
             for kill in to_kill:
                 self.refuse(kill[0])
                 print 'Transaction killed id: ', kill[0]
+            self.save_to_file()
             time.sleep(1)
         
 abc = Server()

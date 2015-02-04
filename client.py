@@ -67,22 +67,22 @@ class Client:
         response = self.client.writeBase64(filepath=input, content=data_base)
         result = response.writereturn
         id_trans = int(result)
-        self.writes.append([self.nrserwera, id_trans, -1])  # czy byl commit
+        if id_trans >= 0:
+            self.writes.append([self.nrserwera, id_trans, -1])  # czy byl commit
         return id_trans
 
     def transaction(self):
-        input = raw_input('Akceptujemy transakcje? (T/N,domyslnie=N) ')
-
         if len(self.writes) > 0:
+            input = raw_input('Akceptujemy transakcje? (T/N,domyslnie=N) ')
             guard = 0
             if input.lower() == 't':
                 for write in self.writes:
                     if self.can_commit(write[0], write[1]) != 0:
                         guard = 1
                 if guard == 0:
-                    print 'Jeden z serwerow anulowal'
                     return self.commit()
                 else:
+                    print 'Jeden z serwerow anulowal'
                     return self.abort()
             else:
                 return self.abort()
@@ -98,8 +98,8 @@ class Client:
         guard = 0
         for write in self.writes:
             self.do_change_server(write[0])
+            print write[2]
             if self.acceptTransaction(write[1]) == 0:
-                print 'jeeeeeeeeeeeeeeeeeeeeeeeestem'
                 write[2] = 0
             else:
                 guard = 1
@@ -117,14 +117,16 @@ class Client:
         return 1
 
     def abort_withrollback(self):
-        print 'uwaaaaga rollllback'
+        print 'jeden z serwerow anulowal'
         for write in self.writes:
             self.do_change_server(write[0])
-            if write[0] == -1:  # jesli nie bylo jeszcze commita robi abort
+            if write[2] == -1:  # jesli nie bylo jeszcze commita robi abort
                 self.refuseTransaction(write[1])
             else:  # jesli byl robimy rollbacka
-                response = self.client.rollback(transactionId=write[1])
-                result = response.rollbackreturn
+                print 'wykonujemy rollback'
+                print write[1]
+                response = self.client.forceRollback(transactionId=write[1])
+                result = response.forcerollbackreturn
                 # brakuje info co jesli inna aplikacja zablokuje juz plik
         return 2
 
@@ -139,8 +141,9 @@ class Client:
         return int(result)
 
     def program(self):
+        print '-----------------------------------------'
         print 'Co chcesz wykonac?:\nserwer - zmiana serwera\nls - odczyt plikow w katalogu\nread - odczyt pliku\nstart -rozpoczecie transakcji\nkoniec - koniec programu'
-
+        print '-----------------------------------------'
         todo = raw_input()
         if todo == 'serwer':
             self.change_server()
@@ -158,7 +161,9 @@ class Client:
             self.kill = 1
 
     def program_transakcji(self):
+        print '-----------------------------------------'
         print 'Co chcesz wykonac?:\nserwer - zmiana serwera\nls - odczyt plikow w katalogu\nread - odczyt pliku\nwrite -zapis do pliku\nstop - koniec transakcji\nkoniec - koniec programu'
+        print '-----------------------------------------'
         todo = raw_input()
         if todo == 'serwer':
             self.change_server()
