@@ -1,7 +1,7 @@
 #Wymagania:
 
-*python2.7
-*pysimplesoap1.16
+* python2.7
+* pysimplesoap1.16
 
 #Uruchamianie serwera
 Po skonfigurowaniu pliku ini, można uruchomić serwer komenda python server.py serwerX (gdzie X nr serwera). Można uruchomić w kilku terminalach różne serwery (dla różnych id)
